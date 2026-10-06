@@ -26,6 +26,45 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        #print-report-root { display: none; }
+        @page { size: A4; margin: 16mm; }
+        @media print {
+            html, body {
+                display: block !important;
+                width: auto !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                background: #fff !important;
+                color: #111827 !important;
+                font-family: Arial, sans-serif !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            body > *:not(#print-report-root) { display: none !important; }
+            #print-report-root {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                color: #111827 !important;
+                font-size: 10pt !important;
+                line-height: 1.45 !important;
+            }
+            #print-report-root h1 { font-size: 22pt; margin: 0 0 4pt; }
+            #print-report-root h2 { font-size: 14pt; margin: 18pt 0 7pt; border-bottom: 1px solid #94a3b8; padding-bottom: 4pt; }
+            #print-report-root h3 { font-size: 11pt; margin: 10pt 0 4pt; }
+            #print-report-root p { margin: 4pt 0; }
+            #print-report-root .report-muted { color: #475569 !important; font-size: 8.5pt; }
+            #print-report-root .report-panel { border: 1px solid #cbd5e1; border-radius: 6pt; padding: 9pt; margin: 7pt 0; break-inside: avoid; }
+            #print-report-root table { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+            #print-report-root th, #print-report-root td { border: 1px solid #cbd5e1; padding: 5pt 6pt; text-align: left; vertical-align: top; }
+            #print-report-root th { width: 30%; background: #f1f5f9 !important; }
+            #print-report-root img { max-width: 260px; max-height: 190px; object-fit: contain; }
+            #print-report-root a { color: #075985 !important; text-decoration: underline; overflow-wrap: anywhere; }
+            #print-report-root .report-break { break-before: page; }
+            #print-report-root .report-prewrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+            #print-report-root li { margin: 3pt 0; }
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 h-full flex flex-col selection:bg-cyan-500 selection:text-white">
@@ -44,6 +83,9 @@
             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-2"></span> PubChem 공개 API 사용
             </span>
+            <button type="button" onclick="printReport()" class="px-3 py-1.5 rounded-lg text-xs bg-cyan-700 hover:bg-cyan-600 text-white transition-colors border border-cyan-600 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-pdf"></i> PDF 리포트
+            </button>
             <button onclick="resetApp()" class="px-3 py-1.5 rounded-lg text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors border border-slate-600 flex items-center gap-1.5">
                 <i class="fa-solid fa-rotate-right"></i> 초기화
             </button>
@@ -410,6 +452,8 @@
         </section>
     </main>
 
+    <section id="print-report-root" aria-label="PDF 독성학 1차 검토 보고서"></section>
+
     <script>
         const presets = [
             { name: "메틸파라벤 (Methylparaben)", query: "Methylparaben", smiles: "COC(=O)C1=CC=C(O)C=C1" },
@@ -703,6 +747,177 @@
             detail.textContent = explanation;
             basis.textContent = `검토 상태: 우려 신호 ${concernCount}개 · 미확인 ${unknownCount}개 · MoS ${hasValidMos ? new Intl.NumberFormat('ko-KR', { maximumSignificantDigits: 5 }).format(mos) : '미계산'} · 한계: ${limitations.join('; ')}.`;
             panel.className = `mt-4 rounded-xl border ${color} p-4`;
+        }
+
+        function appendReportText(parent, tag, text, className = '') {
+            const element = document.createElement(tag);
+            element.textContent = text || '자료 없음';
+            if (className) element.className = className;
+            parent.appendChild(element);
+            return element;
+        }
+
+        function appendReportSection(root, title, className = '') {
+            const section = document.createElement('section');
+            if (className) section.className = className;
+            appendReportText(section, 'h2', title);
+            root.appendChild(section);
+            return section;
+        }
+
+        function appendReportTable(parent, rows) {
+            const table = document.createElement('table');
+            const body = document.createElement('tbody');
+            rows.forEach(([label, value]) => {
+                const row = document.createElement('tr');
+                appendReportText(row, 'th', label);
+                const cell = document.createElement('td');
+                cell.textContent = value || '자료 없음';
+                cell.className = 'report-prewrap';
+                row.appendChild(cell);
+                body.appendChild(row);
+            });
+            table.appendChild(body);
+            parent.appendChild(table);
+            return table;
+        }
+
+        function appendReportLink(parent, label, url) {
+            if (!url) return;
+            const paragraph = document.createElement('p');
+            const link = document.createElement('a');
+            link.href = url;
+            link.textContent = label;
+            paragraph.appendChild(link);
+            parent.appendChild(paragraph);
+        }
+
+        function printReport() {
+            const root = document.getElementById('print-report-root');
+            root.replaceChildren();
+
+            const title = currentCompound?.name || document.getElementById('lookup-input').value.trim() || '화합물 미조회';
+            appendReportText(root, 'h1', '화장품 성분 독성학 1차 검토 보고서');
+            appendReportText(root, 'p', `대상 물질: ${title}`, 'report-muted');
+            appendReportText(root, 'p', `보고서 생성: ${new Date().toLocaleString('ko-KR')} · 공개자료 탐색 및 사용자 입력 기반`, 'report-muted');
+
+            const summary = appendReportSection(root, '1. 1차 스크리닝 요약');
+            const summaryPanel = document.createElement('div');
+            summaryPanel.className = 'report-panel';
+            appendReportText(summaryPanel, 'h3', document.getElementById('toxicity-triage-heading').textContent);
+            appendReportText(summaryPanel, 'p', document.getElementById('toxicity-triage-detail').textContent);
+            appendReportText(summaryPanel, 'p', document.getElementById('toxicity-triage-basis').textContent, 'report-muted');
+            appendReportText(summaryPanel, 'p', '본 분류는 사용자가 선택한 endpoint 상태와 입력한 노출·NOAEL 값에 따른 검토 우선순위이며 안전성 결론이 아닙니다. 출처, 구조 일치, 시험 적절성 및 법규 적용 여부는 별도 전문 검토가 필요합니다.', 'report-muted');
+            summary.appendChild(summaryPanel);
+
+            const identity = appendReportSection(root, '2. 물질 식별 및 구조');
+            const properties = currentCompound?.properties || {};
+            const selectedType = document.getElementById('lookup-type');
+            appendReportTable(identity, [
+                ['입력 검색어', document.getElementById('lookup-input').value.trim()],
+                ['입력 형식', selectedType.selectedOptions[0]?.textContent],
+                ['PubChem 조회 상태', document.getElementById('lookup-status').textContent],
+                ['PubChem CID', currentCompound?.cid],
+                ['PubChem 등록명', currentCompound?.name],
+                ['분자식', properties.MolecularFormula],
+                ['분자량 (g/mol)', properties.MolecularWeight],
+                ['XLogP (계산 추정치)', properties.XLogP],
+                ['Connectivity SMILES', properties.ConnectivitySMILES]
+            ]);
+            const structureImage = document.getElementById('molecule-image');
+            if (currentCompound && !structureImage.hidden && structureImage.complete && structureImage.naturalWidth > 0) {
+                const image = structureImage.cloneNode();
+                image.alt = `PubChem CID ${currentCompound.cid} 2D 구조`;
+                identity.appendChild(image);
+            } else {
+                appendReportText(identity, 'p', '2D 구조 이미지가 현재 조회 결과에 없습니다.', 'report-muted');
+            }
+            if (currentCompound) {
+                appendReportLink(identity, `PubChem CID ${currentCompound.cid} 레코드`, `https://pubchem.ncbi.nlm.nih.gov/compound/${currentCompound.cid}`);
+            }
+
+            const hazard = appendReportSection(root, '3. 독성 endpoint 검토 상태');
+            const endpointNames = ['유전독성·변이원성', '발암성', '생식·발생독성 / 내분비 관련', '피부 자극·부식 / 피부 감작성', '반복투여 전신독성'];
+            const endpointRows = [...document.querySelectorAll('[data-triage-endpoint]')].map((select, index) => [
+                endpointNames[index] || `Endpoint ${index + 1}`,
+                select.selectedOptions[0]?.textContent
+            ]);
+            appendReportTable(hazard, endpointRows);
+            appendReportText(hazard, 'p', `검토 출처: ${document.getElementById('triage-hazard-source').value.trim()}`, 'report-prewrap');
+            appendReportText(hazard, 'p', `PubChem ${document.getElementById('data-section').selectedOptions[0]?.textContent} 표시 내용: ${document.getElementById('endpoint-description-text').textContent}`, 'report-muted report-prewrap');
+
+            const exposure = appendReportSection(root, '4. 피부 노출 및 MoS 계산');
+            appendReportTable(exposure, [
+                ['제품 사용량 (g/day)', document.getElementById('product-amount-input').value],
+                ['성분 농도 (% w/w)', document.getElementById('concentration-input').value],
+                ['피부 흡수율 (%)', document.getElementById('absorption-input').value],
+                ['잔류율', document.getElementById('retention-input').value],
+                ['체중 (kg)', document.getElementById('bodyweight-input').value],
+                ['NOAEL (mg/kg bw/day)', document.getElementById('noael-input').value],
+                ['NOAEL 출처', document.getElementById('noael-source-input').value.trim()],
+                ['계산 결과', document.getElementById('mos-result').innerText]
+            ]);
+            appendReportText(exposure, 'p', '계산값은 입력값을 그대로 사용하며, 입력 근거·흡수율의 적절성 또는 시나리오 타당성을 자동 검증하지 않습니다. MoS 100은 일부 화장품 평가에서 쓰이는 참고 기준일 뿐 보편적 안전 기준이 아닙니다.', 'report-muted');
+
+            const pubmed = appendReportSection(root, '5. PubMed 문헌 및 자동 추출 근거 후보', 'report-break');
+            appendReportText(pubmed, 'p', `PubMed 검색 상태: ${document.getElementById('pubmed-status').textContent}`, 'report-muted');
+            appendReportText(pubmed, 'p', `키워드 추출 상태: ${document.getElementById('pubmed-evidence-status').textContent}`, 'report-muted');
+            const candidates = [...document.querySelectorAll('#pubmed-evidence-candidates article')];
+            if (candidates.length) {
+                candidates.forEach(candidate => {
+                    const card = document.createElement('div');
+                    card.className = 'report-panel';
+                    const paragraphs = candidate.querySelectorAll('p');
+                    appendReportText(card, 'h3', paragraphs[0]?.textContent);
+                    appendReportText(card, 'p', paragraphs[1]?.textContent, 'report-prewrap');
+                    const link = candidate.querySelector('a');
+                    if (link) appendReportLink(card, link.textContent, link.href);
+                    pubmed.appendChild(card);
+                });
+            } else {
+                appendReportText(pubmed, 'p', '표시된 PubMed 결과 또는 근거 후보가 없습니다.', 'report-muted');
+            }
+
+            const articleSection = appendReportSection(root, '6. PubMed 검색 결과', 'report-break');
+            const articles = [...document.querySelectorAll('#pubmed-results article')];
+            if (articles.length) {
+                articles.forEach(article => {
+                    const card = document.createElement('div');
+                    card.className = 'report-panel';
+                    const heading = article.querySelector('h3');
+                    const paragraphs = article.querySelectorAll('p');
+                    appendReportText(card, 'h3', heading?.textContent);
+                    if (paragraphs[0]) appendReportText(card, 'p', paragraphs[0].textContent, 'report-muted');
+                    if (paragraphs[1]) appendReportText(card, 'p', paragraphs[1].textContent, 'report-prewrap');
+                    const link = article.querySelector('a');
+                    if (link) appendReportLink(card, link.textContent, link.href);
+                    articleSection.appendChild(card);
+                });
+            } else {
+                appendReportText(articleSection, 'p', 'PubMed 논문 결과가 없습니다.', 'report-muted');
+            }
+
+            const cir = appendReportSection(root, '7. CIR 및 자료 출처');
+            [...document.querySelectorAll('#cir-results a, #features-container a')].forEach(link => {
+                appendReportLink(cir, link.textContent, link.href);
+            });
+            if (!cir.querySelector('a')) appendReportText(cir, 'p', '현재 표시된 외부 출처 링크가 없습니다.', 'report-muted');
+
+            const readAcross = appendReportSection(root, '8. Read-across 검토 체크리스트', 'report-break');
+            const checklist = document.createElement('ul');
+            document.querySelectorAll('[data-read-across-check]').forEach(check => {
+                const item = document.createElement('li');
+                const label = check.closest('label')?.innerText.trim() || '검토 항목';
+                item.textContent = `${check.checked ? '[확인]' : '[미확인]'} ${label}`;
+                checklist.appendChild(item);
+            });
+            readAcross.appendChild(checklist);
+
+            const limitations = appendReportSection(root, '9. 해석상 한계');
+            appendReportText(limitations, 'p', '이 보고서는 초기 자료 정리와 검토 우선순위 설정을 위한 것입니다. PubChem·PubMed 검색은 전체 문헌을 보장하지 않으며, 초록의 키워드 추출은 문장의 긍정·부정 의미, 시험 품질, 물질 동일성 또는 인과성을 판정하지 않습니다.');
+            appendReportText(limitations, 'p', 'Hazard(고유 유해성), Exposure(노출량·경로·기간), Risk(특정 노출조건에서의 위해성)는 별도로 검토해야 합니다. 이 보고서는 QSAR 독성 예측이나 최종 안전성·법규 적합성 평가를 제공하지 않습니다.', 'report-muted');
+
+            window.print();
         }
 
         function collectInformation(section) {
