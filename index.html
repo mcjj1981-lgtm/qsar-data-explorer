@@ -229,7 +229,7 @@
                     </h2>
                     <span id="pubmed-status" class="text-xs text-slate-400" aria-live="polite">화합물을 조회하면 관련 논문을 검색합니다.</span>
                 </div>
-                <p class="text-xs text-slate-400 mb-3">PubMed에 등재된 논문의 제목, 서지정보 및 초록 일부입니다. 논문 초록은 NOAEL이나 안전성 판정을 대신하지 않습니다.</p>
+                <p class="text-xs text-slate-400 mb-3">PubMed에 등재된 관련 논문을 최대 10건 표시합니다. 논문 초록은 NOAEL이나 안전성 판정을 대신하지 않습니다.</p>
                 <div id="pubmed-results" class="space-y-3">
                     <p class="text-sm text-slate-400">화합물을 검색하면 관련 PubMed 논문이 여기에 표시됩니다.</p>
                 </div>
@@ -322,6 +322,24 @@
                         <input id="triage-hazard-source" type="text" placeholder="평가서·시험보고서·논문 URL 등 (확인한 endpoint를 식별할 수 있게 기록)"
                             class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500">
                     </label>
+                </div>
+                <div class="mt-4 p-3 bg-slate-900/60 border border-slate-700 rounded-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-200">PubMed 초록 근거 후보 자동 찾기</p>
+                            <p class="text-[11px] text-slate-400 mt-1">표시 논문의 초록에서 endpoint 관련 문장을 찾아 보여줍니다. 우려/비우려 의미나 시험 품질을 판정하지 않으며 endpoint 상태를 자동 변경하지 않습니다.</p>
+                        </div>
+                        <form id="pubmed-id-form" class="flex items-center gap-2 shrink-0">
+                            <label for="pubmed-id-input" class="sr-only">추가할 PubMed PMID</label>
+                            <input id="pubmed-id-input" type="text" inputmode="numeric" pattern="[0-9]+" placeholder="PMID 입력"
+                                class="w-28 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200 placeholder:text-slate-500">
+                            <button type="submit" class="rounded-lg bg-cyan-700 hover:bg-cyan-600 px-3 py-2 text-xs font-semibold text-white">논문 추가</button>
+                        </form>
+                    </div>
+                    <p id="pubmed-evidence-status" class="text-[11px] text-slate-400 mt-2" aria-live="polite">PubMed 검색 후 근거 후보가 여기에 표시됩니다. PMID를 직접 입력해 논문을 추가할 수도 있습니다.</p>
+                    <div id="pubmed-evidence-candidates" class="mt-2 space-y-2">
+                        <p class="text-xs text-slate-500">아직 추출된 근거 후보가 없습니다.</p>
+                    </div>
                 </div>
                 <div id="toxicity-triage-result" class="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4" aria-live="polite">
                     <p id="toxicity-triage-heading" class="text-base font-bold text-slate-200">초기 분류: 자료 부족</p>
@@ -809,7 +827,116 @@
             }
         }
 
-        function renderPubMedArticles(xmlText) {
+        const pubmedEndpointPatterns = [
+            { label: '유전독성·변이원성', patterns: [/\bgenotox\w*/i, /\bmutagen\w*/i, /\bAmes\b/i, /chromosom\w+ aberration/i, /\bclastogen\w*/i] },
+            { label: '발암성', patterns: [/\bcarcinogen\w*/i, /\bcarcinogenic\w*/i, /\btumou?r\w*/i, /\bneoplasm\w*/i] },
+            { label: '생식·발생독성 / 내분비 관련', patterns: [/\breproduct\w*/i, /\bfertil\w*/i, /\bspermat\w*/i, /\btesticular\b/i, /\bteratogen\w*/i, /\bembryo\w*/i, /\bdevelopmental toxic\w*/i, /\buterotrophic\b/i, /\bestrogenic\b/i, /\bendocrine\b/i] },
+            { label: '피부 자극·감작성', patterns: [/\bskin sensitiz\w*/i, /\bsensiti[sz]\w*/i, /\bdermatitis\b/i, /\bpatch test\w*/i, /\bskin irritat\w*/i, /\birritant\b/i, /\ballergic reaction\w*/i] },
+            { label: '반복투여·전신독성 / 노출·MoS', patterns: [/\bNOAEL\b/i, /\bNOEL\b/i, /\bmargin of safety\b/i, /\brepeated[- ]dose\b/i, /\bsubchronic\b/i, /\bchronic toxicity\b/i, /\bsystemic toxicity\b/i, /\badverse effect\w*/i] }
+        ];
+        let currentPubMedArticleIds = new Set();
+        let currentPubMedEvidence = [];
+
+        function extractPubMedEndpointCandidates(article) {
+            const pmid = article.getElementsByTagName('PMID')[0]?.textContent?.trim() || '';
+            const title = article.getElementsByTagName('ArticleTitle')[0]?.textContent?.trim() || '제목 자료 없음';
+            const abstract = [...article.getElementsByTagName('AbstractText')]
+                .map(part => part.textContent.trim())
+                .filter(Boolean)
+                .join(' ');
+            if (!abstract) return [];
+
+            const sentences = abstract.split(/(?<=[.!?])\s+(?=[A-Z])/);
+            const candidates = [];
+            pubmedEndpointPatterns.forEach(endpoint => {
+                const matches = sentences
+                    .map(sentence => sentence.trim())
+                    .filter(sentence => endpoint.patterns.some(pattern => pattern.test(sentence)))
+                    .slice(0, 2);
+                matches.forEach(sentence => {
+                    candidates.push({
+                        pmid,
+                        title,
+                        endpoint: endpoint.label,
+                        sentence: sentence.length > 420 ? `${sentence.slice(0, 417)}…` : sentence
+                    });
+                });
+            });
+            return candidates;
+        }
+
+        function renderPubMedEndpointCandidates(candidates) {
+            const container = document.getElementById('pubmed-evidence-candidates');
+            const status = document.getElementById('pubmed-evidence-status');
+            container.replaceChildren();
+            const uniqueCandidates = [...new Map(candidates.map(item => [
+                `${item.pmid}|${item.endpoint}|${item.sentence}`,
+                item
+            ])).values()].slice(0, 24);
+
+            if (!uniqueCandidates.length) {
+                status.textContent = currentPubMedArticleIds.size
+                    ? '표시된 초록에서 설정된 endpoint 키워드를 찾지 못했습니다. 이는 독성 자료가 없거나 안전하다는 뜻이 아닙니다.'
+                    : 'PubMed 논문이 조회되면 초록에서 endpoint 관련 문장을 찾습니다.';
+                const empty = document.createElement('p');
+                empty.className = 'text-xs text-slate-400';
+                empty.textContent = '현재 표시된 초록에서 후보 문장을 찾지 못했습니다. 검색 결과와 논문 원문도 직접 확인하세요.';
+                container.appendChild(empty);
+                return;
+            }
+
+            status.textContent = `키워드 규칙으로 ${uniqueCandidates.length}개 근거 문장 후보를 찾았습니다. 문맥·시험 적절성은 직접 검토하세요.`;
+            uniqueCandidates.forEach(candidate => {
+                const card = document.createElement('article');
+                card.className = 'rounded-lg border border-slate-700 bg-slate-950/70 p-3';
+                const heading = document.createElement('p');
+                heading.className = 'text-xs font-semibold text-cyan-300';
+                heading.textContent = `${candidate.endpoint} · PMID ${candidate.pmid || '없음'}`;
+                const quote = document.createElement('p');
+                quote.className = 'mt-1 text-xs leading-relaxed text-slate-300';
+                quote.textContent = `“${candidate.sentence}”`;
+                const actions = document.createElement('div');
+                actions.className = 'mt-2 flex flex-wrap items-center gap-3';
+
+                if (candidate.pmid) {
+                    const link = document.createElement('a');
+                    link.className = 'text-[11px] text-cyan-400 underline hover:text-cyan-300';
+                    link.href = `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(candidate.pmid)}/`;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = `원문 기록: ${candidate.title}`;
+                    actions.appendChild(link);
+                }
+
+                const sourceButton = document.createElement('button');
+                sourceButton.type = 'button';
+                sourceButton.className = 'text-[11px] text-slate-300 underline hover:text-white';
+                sourceButton.textContent = '검토 출처에 추가';
+                sourceButton.addEventListener('click', () => {
+                    const sourceInput = document.getElementById('triage-hazard-source');
+                    const citation = candidate.pmid
+                        ? `PMID ${candidate.pmid} (${candidate.endpoint} 후보)`
+                        : `${candidate.title} (${candidate.endpoint} 후보)`;
+                    const existing = sourceInput.value.split(/\s*;\s*/).filter(Boolean);
+                    if (!existing.includes(citation)) existing.push(citation);
+                    sourceInput.value = existing.join('; ');
+                    sourceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    sourceInput.focus();
+                });
+                actions.appendChild(sourceButton);
+                card.append(heading, quote, actions);
+                container.appendChild(card);
+            });
+
+            if (candidates.length > uniqueCandidates.length) {
+                const note = document.createElement('p');
+                note.className = 'text-[11px] text-slate-500';
+                note.textContent = '화면에는 최대 24개 후보만 표시합니다.';
+                container.appendChild(note);
+            }
+        }
+
+        function renderPubMedArticles(xmlText, append = false) {
             const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
             if (xml.querySelector('parsererror')) {
                 throw new Error('PubMed 응답을 읽을 수 없습니다.');
@@ -817,14 +944,26 @@
 
             const articles = [...xml.getElementsByTagName('PubmedArticle')];
             const container = document.getElementById('pubmed-results');
-            container.innerHTML = '';
+            if (!append) {
+                container.replaceChildren();
+                currentPubMedArticleIds = new Set();
+                currentPubMedEvidence = [];
+            }
             if (!articles.length) {
-                container.innerHTML = '<p class="text-sm text-slate-400">PubMed에서 초록이 포함된 논문을 찾지 못했습니다. PubMed 검색 링크에서 다른 검색어도 확인해보세요.</p>';
-                return 0;
+                if (!append) {
+                    container.innerHTML = '<p class="text-sm text-slate-400">PubMed에서 초록이 포함된 논문을 찾지 못했습니다. PubMed 검색 링크에서 다른 검색어도 확인해보세요.</p>';
+                    renderPubMedEndpointCandidates([]);
+                }
+                return currentPubMedArticleIds.size;
             }
 
+            const endpointCandidates = [];
+            let addedCount = 0;
             articles.forEach(article => {
                 const pmid = article.getElementsByTagName('PMID')[0]?.textContent?.trim();
+                if (pmid && currentPubMedArticleIds.has(pmid)) return;
+                if (pmid) currentPubMedArticleIds.add(pmid);
+                addedCount++;
                 const title = article.getElementsByTagName('ArticleTitle')[0]?.textContent?.trim() || '제목 자료 없음';
                 const journal = article.getElementsByTagName('ISOAbbreviation')[0]?.textContent?.trim()
                     || article.getElementsByTagName('Title')[0]?.textContent?.trim()
@@ -845,8 +984,10 @@
                     .map(part => part.textContent.trim())
                     .filter(Boolean)
                     .join(' ');
+                endpointCandidates.push(...extractPubMedEndpointCandidates(article));
 
                 const card = document.createElement('article');
+                if (pmid) card.id = `pubmed-article-${pmid}`;
                 card.className = 'bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 space-y-2';
                 const heading = document.createElement('h3');
                 heading.className = 'text-sm font-semibold text-cyan-300';
@@ -881,7 +1022,38 @@
                 }
                 container.appendChild(card);
             });
-            return articles.length;
+            currentPubMedEvidence = [...currentPubMedEvidence, ...endpointCandidates];
+            renderPubMedEndpointCandidates(currentPubMedEvidence);
+            return addedCount;
+        }
+
+        async function addPubMedArticleById(event) {
+            event.preventDefault();
+            const input = document.getElementById('pubmed-id-input');
+            const status = document.getElementById('pubmed-evidence-status');
+            const pmid = input.value.trim();
+            if (!/^\d+$/.test(pmid)) {
+                status.textContent = 'PMID는 숫자만 입력해주세요.';
+                return;
+            }
+
+            status.textContent = `PMID ${pmid} 논문의 초록을 가져오는 중입니다.`;
+            try {
+                const alreadyDisplayed = currentPubMedArticleIds.has(pmid);
+                const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${encodeURIComponent(pmid)}&retmode=xml`;
+                const xml = await fetchPubMedText(url);
+                const displayed = renderPubMedArticles(xml, true);
+                if (alreadyDisplayed && !displayed) {
+                    status.textContent = `PMID ${pmid}는 이미 논문 목록과 근거 후보에 표시되어 있습니다.`;
+                } else if (!displayed) {
+                    status.textContent = `PMID ${pmid}에서 표시할 논문을 가져오지 못했습니다. PMID를 확인해주세요.`;
+                } else {
+                    status.textContent = `PMID ${pmid} 논문을 추가했습니다. 추출된 문장은 후보이므로 원문과 문맥을 확인하세요.`;
+                    input.value = '';
+                }
+            } catch (error) {
+                status.textContent = error.message || `PMID ${pmid} 논문을 가져오지 못했습니다.`;
+            }
         }
 
         async function searchPubMed(compoundName, casNumber = '') {
@@ -893,7 +1065,7 @@
             const searchTerms = [`"${compoundName.replace(/"/g, '')}"[Title/Abstract]`];
             if (casNumber) searchTerms.push(`"${casNumber}"[Title/Abstract]`);
             const query = searchTerms.length > 1 ? `(${searchTerms.join(' OR ')})` : searchTerms[0];
-            const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=5&retmode=json&sort=relevance`;
+            const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=10&retmode=json&sort=relevance`;
             try {
                 const searchResponse = await fetchPubMedText(searchUrl);
                 const searchData = JSON.parse(searchResponse);
@@ -902,7 +1074,7 @@
                 const count = Number(result?.count || 0);
                 if (!ids.length) {
                     container.innerHTML = '<p class="text-sm text-slate-400">PubMed에서 관련 논문을 찾지 못했습니다.</p>';
-                    status.textContent = `검색 결과 0건 · ${count}건 중 최대 5건 표시`;
+                    status.textContent = `검색 결과 0건 · ${count}건 중 최대 10건 표시`;
                     return;
                 }
 
@@ -1225,6 +1397,7 @@
             document.querySelectorAll('[data-triage-endpoint]').forEach(select => {
                 select.addEventListener('change', updateToxicityTriage);
             });
+            document.getElementById('pubmed-id-form').addEventListener('submit', addPubMedArticleById);
             ['triage-hazard-source', 'noael-input', 'noael-source-input'].forEach(id => {
                 document.getElementById(id).addEventListener('input', updateToxicityTriage);
             });
