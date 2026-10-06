@@ -267,6 +267,73 @@
             </section>
 
             <section class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 shadow-xl backdrop-blur-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                    <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-cyan-400"></i> 독성학 1차 스크리닝
+                    </h2>
+                    <span class="text-xs text-slate-400">근거 기반 검토 우선순위 · 최종 안전성 판정 아님</span>
+                </div>
+                <p class="text-xs text-slate-400 mb-4">
+                    PubChem 문헌 문구를 자동으로 긍정·음성 판정하지 않습니다. 검토한 자료에 따라 각 endpoint 상태를 선택하고 출처를 기록하세요. 시험이 없거나 충분하지 않은 경우는 “미확인/자료 부족”으로 두세요.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="text-xs text-slate-300">
+                        유전독성·변이원성
+                        <select data-triage-endpoint class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200">
+                            <option value="unknown">미확인 / 자료 부족</option>
+                            <option value="concern">우려 신호 보고됨</option>
+                            <option value="no-signal">적절한 시험에서 우려 신호 확인되지 않음</option>
+                        </select>
+                    </label>
+                    <label class="text-xs text-slate-300">
+                        발암성
+                        <select data-triage-endpoint class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200">
+                            <option value="unknown">미확인 / 자료 부족</option>
+                            <option value="concern">우려 신호 보고됨</option>
+                            <option value="no-signal">적절한 시험에서 우려 신호 확인되지 않음</option>
+                        </select>
+                    </label>
+                    <label class="text-xs text-slate-300">
+                        생식·발생독성
+                        <select data-triage-endpoint class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200">
+                            <option value="unknown">미확인 / 자료 부족</option>
+                            <option value="concern">우려 신호 보고됨</option>
+                            <option value="no-signal">적절한 시험에서 우려 신호 확인되지 않음</option>
+                        </select>
+                    </label>
+                    <label class="text-xs text-slate-300">
+                        피부 자극·부식 / 피부 감작성
+                        <select data-triage-endpoint class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200">
+                            <option value="unknown">미확인 / 자료 부족</option>
+                            <option value="concern">우려 신호 보고됨</option>
+                            <option value="no-signal">적절한 시험에서 우려 신호 확인되지 않음</option>
+                        </select>
+                    </label>
+                    <label class="text-xs text-slate-300 md:col-span-2">
+                        반복투여 전신독성
+                        <select data-triage-endpoint class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200">
+                            <option value="unknown">미확인 / 자료 부족</option>
+                            <option value="concern">우려 신호 보고됨</option>
+                            <option value="no-signal">적절한 시험에서 우려 신호 확인되지 않음</option>
+                        </select>
+                    </label>
+                    <label class="text-xs text-slate-300 md:col-span-2">
+                        독성 endpoint 검토 출처
+                        <input id="triage-hazard-source" type="text" placeholder="평가서·시험보고서·논문 URL 등 (확인한 endpoint를 식별할 수 있게 기록)"
+                            class="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500">
+                    </label>
+                </div>
+                <div id="toxicity-triage-result" class="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4" aria-live="polite">
+                    <p id="toxicity-triage-heading" class="text-base font-bold text-slate-200">초기 분류: 자료 부족</p>
+                    <p id="toxicity-triage-detail" class="text-sm text-slate-300 mt-1">endpoint 검토 상태와 노출 평가를 입력하면 우선 검토 항목을 표시합니다.</p>
+                    <p id="toxicity-triage-basis" class="text-xs text-slate-400 mt-2"></p>
+                </div>
+                <p class="text-[11px] text-amber-200 mt-3">
+                    “우려 신호 제한적”은 안전하다는 뜻이 아닙니다. 이 스크리닝은 선택한 근거의 진위·품질을 검증하지 않으며, 법규 적합성 또는 전문 안전성 평가를 대체하지 않습니다.
+                </p>
+            </section>
+
+            <section class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-5 shadow-xl backdrop-blur-sm">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
                         <i class="fa-solid fa-calculator text-cyan-400"></i> Margin of Safety (MoS) 계산기
@@ -524,12 +591,14 @@
                 && Number.isFinite(bodyweight) && bodyweight > 0;
             if (!valid) {
                 result.innerHTML = '<p class="text-sm text-rose-300">제품 사용량·체중은 0보다 크게, 농도·흡수율은 0–100%에서 0보다 크게, 잔류율은 0 초과–1 범위로 입력해주세요. 피부 흡수율은 시험 등 근거 자료를 사용하세요.</p>';
+                updateToxicityTriage();
                 return;
             }
 
             const sed = (productAmount * 1000 * (concentration / 100) * (absorption / 100) * retention) / bodyweight;
             if (!Number.isFinite(sed) || sed <= 0) {
                 result.innerHTML = '<p class="text-sm text-rose-300">입력값으로 유효한 SED를 계산할 수 없습니다. 값의 크기와 단위를 확인해주세요.</p>';
+                updateToxicityTriage();
                 return;
             }
             document.getElementById('sed-input').value = String(sed);
@@ -562,6 +631,60 @@
                 output.push('<p class="text-sm text-slate-400 mt-2">MoS를 계산하려면 신뢰할 수 있는 독성시험의 NOAEL을 입력하세요. 물질명만으로 NOAEL을 자동 추정하지 않습니다.</p>');
                 result.innerHTML = output.join('');
             }
+            updateToxicityTriage();
+        }
+
+        function updateToxicityTriage() {
+            const states = [...document.querySelectorAll('[data-triage-endpoint]')].map(select => select.value);
+            const concernCount = states.filter(state => state === 'concern').length;
+            const unknownCount = states.filter(state => state === 'unknown').length;
+            const allEndpointsReviewed = states.length > 0 && unknownCount === 0;
+            const hazardSourceRecorded = document.getElementById('triage-hazard-source').value.trim().length > 0;
+            const sed = Number(document.getElementById('sed-input').value);
+            const noael = document.getElementById('noael-input').valueAsNumber;
+            const noaelSourceRecorded = document.getElementById('noael-source-input').value.trim().length > 0;
+            const mos = Number.isFinite(sed) && sed > 0 && Number.isFinite(noael) && noael > 0
+                ? noael / sed
+                : NaN;
+            const hasValidMos = Number.isFinite(mos) && mos > 0;
+            const heading = document.getElementById('toxicity-triage-heading');
+            const detail = document.getElementById('toxicity-triage-detail');
+            const basis = document.getElementById('toxicity-triage-basis');
+            const panel = document.getElementById('toxicity-triage-result');
+
+            let classification;
+            let explanation;
+            let color;
+            if (concernCount > 0 || (hasValidMos && mos < 100)) {
+                classification = '초기 분류: 전문 검토 우선';
+                explanation = concernCount > 0
+                    ? `${concernCount}개 endpoint에서 우려 신호가 선택되었습니다. 시험 조건·자료 신뢰성·실제 노출과의 관련성을 확인하세요.`
+                    : `입력된 MoS가 ${new Intl.NumberFormat('ko-KR', { maximumSignificantDigits: 5 }).format(mos)}로, 일부 화장품 평가에서 참고하는 100 미만입니다. NOAEL·흡수율·사용조건을 검증하고 노출 저감 또는 추가 독성자료 필요성을 우선 검토하세요.`;
+                color = 'border-rose-500/40 bg-rose-500/5';
+            } else if (!allEndpointsReviewed || !hazardSourceRecorded || !hasValidMos || !noaelSourceRecorded) {
+                classification = '초기 분류: 자료 부족 · 추가 검토 필요';
+                const missing = [];
+                if (unknownCount > 0) missing.push(`미확인 endpoint ${unknownCount}개`);
+                if (!hazardSourceRecorded) missing.push('독성자료 출처');
+                if (!hasValidMos) missing.push('유효한 SED·NOAEL 기반 MoS');
+                if (!noaelSourceRecorded) missing.push('NOAEL 시험 출처');
+                explanation = `판단에 필요한 항목이 확인되지 않았습니다: ${missing.join(', ')}. 자료가 없거나 검색되지 않은 것은 안전성 근거가 아닙니다.`;
+                color = 'border-amber-500/40 bg-amber-500/5';
+            } else {
+                classification = '초기 분류: 우려 신호 제한적 (조건부)';
+                explanation = `선택한 endpoint에서 우려 신호가 확인되지 않았고 입력값 기준 MoS는 ${new Intl.NumberFormat('ko-KR', { maximumSignificantDigits: 5 }).format(mos)}입니다. 선택 자료와 사용 시나리오 범위의 결과이며, 안전 판정은 아닙니다.`;
+                color = 'border-cyan-500/40 bg-cyan-500/5';
+            }
+
+            const limitations = [];
+            if (hasValidMos && !noaelSourceRecorded) limitations.push('MoS에 사용한 NOAEL 출처 미기록');
+            if (!hazardSourceRecorded) limitations.push('독성 endpoint 출처 미기록');
+            if (Number.isFinite(mos) && mos >= 100) limitations.push('MoS 기준은 일부 평가에서만 참고하는 값');
+            limitations.push('입력 근거·시험 적절성 및 제품 사용조건은 앱이 검증하지 않음');
+            heading.textContent = classification;
+            detail.textContent = explanation;
+            basis.textContent = `검토 상태: 우려 신호 ${concernCount}개 · 미확인 ${unknownCount}개 · MoS ${hasValidMos ? new Intl.NumberFormat('ko-KR', { maximumSignificantDigits: 5 }).format(mos) : '미계산'} · 한계: ${limitations.join('; ')}.`;
+            panel.className = `mt-4 rounded-xl border ${color} p-4`;
         }
 
         function collectInformation(section) {
@@ -1099,6 +1222,13 @@
                     if (event.key === 'Enter') calculateSkinExposure();
                 });
             });
+            document.querySelectorAll('[data-triage-endpoint]').forEach(select => {
+                select.addEventListener('change', updateToxicityTriage);
+            });
+            ['triage-hazard-source', 'noael-input', 'noael-source-input'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateToxicityTriage);
+            });
+            updateToxicityTriage();
             selectPreset(0);
         };
     </script>
